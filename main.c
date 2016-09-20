@@ -198,7 +198,7 @@ static int chunk_sizes[] = {
 	72 * 1024 * 1024,
 	96 * 1024 * 1024,
 	128 * 1024 * 1024,
-#define TEST_L4
+//#define TEST_L4
 #ifdef TEST_L4
 	160 * 1024 * 1024,
 	192 * 1024 * 1024,
@@ -2197,7 +2197,11 @@ main (int argc, char **argv)
 	}
 	puts ("\n");
 
+	dataBegins (graph_title);
+
 	if (is_intel) {
+        dataBeginSection ( "Cache Info", RGB_BLUE);
+
 		uint32_t cache_info[4];
 		i = 0;
 		while (1) {
@@ -2233,7 +2237,14 @@ main (int argc, char **argv)
 			printf ("size %dk ", size);
 			newline ();
 			i++;
-		} 
+            
+            // If this is a cache that holds data
+            if (((cache_info[0] & 31) == 2 || (cache_info[0] & 31) == 3) && csv_output_file) {
+                // Add the cache level and cache size in bytes
+                fprintf (csv_output_file, "%d, %d\n", (cache_info[0] >> 5) & 7, (n_ways * line_size * n_sets));
+                fflush (csv_output_file);
+            }
+         }
 	}
 
 	if (!cpu_has_sse41)
@@ -2273,8 +2284,6 @@ main (int argc, char **argv)
 	}
 	fflush (stdout);
 #endif
-
-	dataBegins (graph_title);
 
 	//------------------------------------------------------------
 	// Sequential non-vector reads.

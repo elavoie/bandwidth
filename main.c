@@ -203,7 +203,7 @@ static int chunk_sizes[] = {
 	72 * 1024 * 1024,
 	96 * 1024 * 1024,
 	128 * 1024 * 1024,
-//#define TEST_L4
+#define TEST_L4
 #ifdef TEST_L4
 	160 * 1024 * 1024,
 	192 * 1024 * 1024,

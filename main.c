@@ -2200,7 +2200,7 @@ main (int argc, char **argv)
 	dataBegins (graph_title);
 
 	if (is_intel) {
-        dataBeginSection ( "Cache Info", RGB_BLUE);
+        dataBeginSection ( "Data Cache Info", RGB_BLUE);
 
 		uint32_t cache_info[4];
 		i = 0;

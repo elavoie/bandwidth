@@ -125,6 +125,11 @@ static uint32_t cpu_has_xd = 0;
 //
 
 static long usec_per_test = 5000000;	// 5 seconds per memory test.
+static int chunk_size_lower_bound = 128;
+static int chunk_size_upper_bound = 512 * 1024 * 1024;
+static int data_cache_info = 0;
+
+#define continue_if_not_in_interval(chunk_size) if ((chunk_size < chunk_size_lower_bound) || (chunk_size > chunk_size_upper_bound)) { continue; };
 
 static int chunk_sizes[] = {
 #ifdef x86
@@ -1994,6 +1999,8 @@ void
 usage ()
 {
 	printf ("Usage: bandwidth [--slow] [--fast] [--faster] [--fastest] [--title string] [--csv file]\n");
+    printf ("Usage for restricting the amount of data used: bandwidth [--lower-bound <bytes>] [--upper-bound <bytes>]\n");
+    printf ("Usage saving information about data cache sizes: bandwidth [--data-cache-info --csv file]\n");
         //printf ("Usage for starting network tests: bandwidth --network <ipaddr1> [<ipaddr2...] [--port <port#>]\n");
         //printf ("Usage for receiving network tests: bandwidth --transponder [--port <port#>]\n");
 
@@ -2080,6 +2087,18 @@ main (int argc, char **argv)
 				usage ();
 		}
 		else
+		if (!strcmp ("--lower-bound", s) && i != argc) {
+            chunk_size_lower_bound = atoi(argv[i++]);
+        }
+        else 
+		if (!strcmp ("--upper-bound", s) && i != argc) {
+            chunk_size_upper_bound = atoi(argv[i++]);
+        }
+        else 
+		if (!strcmp ("--data-cache-info", s)) {
+            data_cache_info = 1;
+        }
+        else
 		if (!strcmp ("--title", s) && i != argc) {
 			snprintf (graph_title, 511, "%s", argv[i++]);
 		}
@@ -2200,7 +2219,9 @@ main (int argc, char **argv)
 	dataBegins (graph_title);
 
 	if (is_intel) {
-        dataBeginSection ( "Data Cache Info", RGB_BLUE);
+        if (data_cache_info) {
+            dataBeginSection ( "Data Cache Info", RGB_BLUE);
+        }
 
 		uint32_t cache_info[4];
 		i = 0;
@@ -2239,11 +2260,15 @@ main (int argc, char **argv)
 			i++;
             
             // If this is a cache that holds data
-            if (((cache_info[0] & 31) == 2 || (cache_info[0] & 31) == 3) && csv_output_file) {
+            if (((cache_info[0] & 31) == 2 || (cache_info[0] & 31) == 3) && data_cache_info && csv_output_file) {
                 // Add the cache level and cache size in bytes
                 fprintf (csv_output_file, "%d, %d\n", (cache_info[0] >> 5) & 7, (n_ways * line_size * n_sets));
                 fflush (csv_output_file);
             }
+         }
+
+         if (data_cache_info) {
+             exit(0);
          }
 	}
 
@@ -2297,6 +2322,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_read (chunk_size, NO_SSE2, false);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2315,6 +2341,7 @@ main (int argc, char **argv)
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
 		if (!(chunk_size & 128)) {
+            continue_if_not_in_interval(chunk_size);
 			int amount = do_read (chunk_size, NO_SSE2, true);
 			dataAddDatum (chunk_size, amount);
 		}
@@ -2333,6 +2360,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_write (chunk_size, NO_SSE2, false);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2352,6 +2380,7 @@ main (int argc, char **argv)
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
 		if (!(chunk_size & 128)) {
+            continue_if_not_in_interval(chunk_size);
 			int amount = do_write (chunk_size, NO_SSE2, true);
 			dataAddDatum (chunk_size, amount);
 		}
@@ -2367,6 +2396,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_read (chunk_size, NEON_128BIT, false);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2380,6 +2410,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_write (chunk_size, NEON_128BIT, false);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2394,6 +2425,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_write (chunk_size, NEON_64BIT, true);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2408,6 +2440,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_read (chunk_size, NEON_64BIT, true);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2424,6 +2457,7 @@ main (int argc, char **argv)
 
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
+            continue_if_not_in_interval(chunk_size);
 			int amount = do_read (chunk_size, SSE2, false);
 			dataAddDatum (chunk_size, amount);
 		}
@@ -2440,6 +2474,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_read (chunk_size, AVX, false);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2458,6 +2493,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_read (chunk_size, SSE2, true);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2474,6 +2510,7 @@ main (int argc, char **argv)
 
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
+            continue_if_not_in_interval(chunk_size);
 			int amount = do_write (chunk_size, SSE2, false);
 			dataAddDatum (chunk_size, amount);
 		}
@@ -2490,6 +2527,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_write (chunk_size, AVX, false);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2508,6 +2546,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_write (chunk_size, SSE2, true);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2524,6 +2563,7 @@ main (int argc, char **argv)
 
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
+            continue_if_not_in_interval(chunk_size);
 			int amount = do_read (chunk_size, SSE2_BYPASS, false);
 			dataAddDatum (chunk_size, amount);
 		}
@@ -2540,6 +2580,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_read (chunk_size, SSE2_BYPASS, true);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2556,6 +2597,7 @@ main (int argc, char **argv)
 
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
+            continue_if_not_in_interval(chunk_size);
 			int amount = do_write (chunk_size, SSE2_BYPASS, false);
 			dataAddDatum (chunk_size, amount);
 		}
@@ -2575,6 +2617,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_write (chunk_size, AVX_BYPASS, false);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2593,6 +2636,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_write (chunk_size, SSE2_BYPASS, true);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2609,6 +2653,7 @@ main (int argc, char **argv)
 
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
+            continue_if_not_in_interval(chunk_size);
 			int amount = do_copy (chunk_size, SSE2);
 			dataAddDatum (chunk_size, amount);
 		}
@@ -2625,6 +2670,7 @@ main (int argc, char **argv)
 		i = 0;
 		while ((chunk_size = chunk_sizes [i++])) {
 			if (!(chunk_size & 128)) {
+                continue_if_not_in_interval(chunk_size);
 				int amount = do_copy (chunk_size, AVX);
 				dataAddDatum (chunk_size, amount);
 			}
@@ -2642,6 +2688,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_read (chunk_size, LODSQ, false);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2656,6 +2703,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_read (chunk_size, LODSD, false);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2669,6 +2717,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_read (chunk_size, LODSW, false);
 		dataAddDatum (chunk_size, amount);
 	}
@@ -2682,6 +2731,7 @@ main (int argc, char **argv)
 
 	i = 0;
 	while ((chunk_size = chunk_sizes [i++])) {
+        continue_if_not_in_interval(chunk_size);
 		int amount = do_read (chunk_size, LODSB, false);
 		dataAddDatum (chunk_size, amount);
 	}
